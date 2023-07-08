@@ -179,8 +179,10 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)
   for(a = va; a < va + npages*PGSIZE; a += PGSIZE){
     if((pte = walk(pagetable, a, 0)) == 0)
       panic("uvmunmap: walk");
-    if((*pte & PTE_V) == 0)
-      panic("uvmunmap: not mapped");
+    if((*pte & PTE_V) == 0) {
+      *pte = 0;
+      continue;
+    }
     if(PTE_FLAGS(*pte) == PTE_V)
       panic("uvmunmap: not a leaf");
     if(do_free){
@@ -284,6 +286,29 @@ freewalk(pagetable_t pagetable)
     }
   }
   kfree((void*)pagetable);
+}
+
+void 
+vmprint(pagetable_t pagetable, int count) {
+  if (count == 0) {
+    printf("page table %p\n", pagetable);
+  }
+
+  for (int i = 0; i < 512; i++) {
+    pte_t pte = pagetable[i];
+    if (pte & PTE_V) {
+      for (int j = 0; j < count; j++) {
+        printf("..");
+      }
+
+      printf("%d: pte %p pa %p\n", i, pte, PTE2PA(pte));
+
+      if ((pte & (PTE_R | PTE_W | PTE_X)) == 0) {
+        pagetable_t child = (pagetable_t)PTE2PA(pte);
+        vmprint(child, count + 1);
+      }
+    }
+  }
 }
 
 // Free user memory pages,
